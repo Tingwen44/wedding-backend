@@ -1,0 +1,15 @@
+# 服务器配置
+PORT=3001
+
+# 邮件配置（可选）
+# 使用 Gmail 时需要生成应用密码：https://myaccount.google.com/apppasswords
+EMAIL_SERVICE=gmail
+EMAIL_USER=tugan6@gmail.com
+EMAIL_PASSWORD=kwrb nmeq tfim vlce
+
+# 接收邮件的地址
+OWNER_EMAIL=tguan6@gmail.com
+GUEST_EMAIL=guest@example.com
+
+# 管理员认证令牌（用于保护 API）
+ADMIN_TOKEN=Silentmafia001.
