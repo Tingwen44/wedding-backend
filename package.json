@@ -19,7 +19,6 @@
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
     "express": "^4.22.1",
-    "nodemailer": "^6.10.1",
-    "sql.js": "^1.10.2"
+    "nodemailer": "^6.10.1"
   }
 }
