@@ -1,0 +1,297 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>管廷文 & 王昕 婚礼邀请函</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@300;600&display=swap" rel="stylesheet">
+    <style>
+        body { 
+            font-family: 'Noto Serif SC', serif; 
+            background-color: #F8F5F2; 
+            margin: 0; 
+            padding: 0;
+            overflow-x: hidden;
+        }
+        .main-wrapper {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .header-img {
+            width: 100%;
+            display: block;
+        }
+        .form-section { 
+            width: 100%;
+            max-width: 600px;
+            padding: 40px 24px 100px 24px;
+            box-sizing: border-box;
+            background-color: #F8F5F2; 
+        }
+        .form-title { 
+            color: #8B0000; 
+            font-size: 1.6rem; 
+            font-weight: 600; 
+            letter-spacing: 0.3em; 
+            margin-bottom: 2.5rem; 
+            text-align: center;
+        }
+        .form-item { margin-bottom: 2rem; text-align: left; }
+        .form-label { 
+            display: block; 
+            font-size: 0.95rem; 
+            margin-bottom: 0.8rem; 
+            color: #444; 
+            border-left: 3px solid #8B0000; 
+            padding-left: 10px; 
+            font-weight: 500;
+        }
+        input[type="text"], input[type="number"] { 
+            width: 100%; 
+            padding: 12px; 
+            border: none; 
+            border-bottom: 1px solid #ccc; 
+            background: rgba(255, 255, 255, 0.4); 
+            outline: none; 
+            font-size: 1rem;
+        }
+        .option-group { display: flex; flex-direction: column; gap: 10px; }
+        .option-btn { 
+            padding: 12px; 
+            border: 1px solid #e0e0e0; 
+            border-radius: 8px; 
+            background: white; 
+            font-size: 0.9rem; 
+            text-align: center; 
+            transition: all 0.3s;
+            cursor: pointer;
+        }
+        input[type="radio"]:checked + .option-btn, 
+        input[type="checkbox"]:checked + .option-btn { 
+            background-color: #8B0000; 
+            color: white; 
+            border-color: #8B0000; 
+        }
+        .submit-btn { 
+            background-color: #8B0000; 
+            color: white; 
+            width: 100%; 
+            padding: 16px; 
+            border-radius: 50px; 
+            margin-top: 3rem; 
+            font-size: 1.1rem; 
+            letter-spacing: 0.6em; 
+            font-weight: 600;
+            box-shadow: 0 4px 15px rgba(139, 0, 0, 0.2);
+            border: none;
+            cursor: pointer;
+        }
+        .submit-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+        .footer-text {
+            font-size: 11px;
+            color: #999;
+            margin-top: 50px;
+            text-align: center;
+            line-height: 1.8;
+        }
+        .success-message {
+            color: #28a745;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+        .error-message {
+            color: #dc3545;
+            font-size: 0.9rem;
+            margin-top: 10px;
+            text-align: center;
+            display: none;
+        }
+        .loading {
+            display: none;
+            text-align: center;
+            color: #8B0000;
+            margin-top: 10px;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-wrapper">
+        <img src="https://pic1.imgdb.cn/item/69b6830886fff564438fa2fc.png" class="header-img" alt="Wedding Invitation">
+
+        <form id="inviteForm" class="form-section">
+            <h2 class="form-title">邀请函确认</h2>
+            
+            <div class="form-item">
+                <span class="form-label">1. 选择参与的婚礼 (单选)</span>
+                <div class="option-group">
+                    <label><input type="radio" name="wedding_location" value="山西晋城 - 凤城国际康养中心 (05.01)" class="hidden" required><div class="option-btn">山西晋城 - 凤城国际康养中心 (05.01)</div></label>
+                    <label><input type="radio" name="wedding_location" value="山东诸城 - 蓝海大酒店 (05.04)" class="hidden"><div class="option-btn">山东诸城 - 蓝海大酒店 (05.04)</div></label>
+                    <label><input type="radio" name="wedding_location" value="我都参加" class="hidden"><div class="option-btn">我都参加</div></label>
+                </div>
+            </div>
+
+            <div class="form-item">
+                <span class="form-label">2. 宾客信息</span>
+                <input type="text" name="guest_name" placeholder="您的姓名:" required class="mb-4">
+                <input type="number" name="guest_count" placeholder="参与人数:" min="1">
+                <input type="text" name="accompanying_guests" placeholder="参与亲友姓名:" class="mt-4">
+            </div>
+
+            <div class="form-item">
+                <span class="form-label">3. 住宿要求 (多选)</span>
+                <div class="option-group">
+                    <label><input type="checkbox" name="accommodation_dates" value="4月30日 (晋城)" class="hidden"><div class="option-btn">4月30日 (晋城)</div></label>
+                    <label><input type="checkbox" name="accommodation_dates" value="5月1日 (晋城)" class="hidden"><div class="option-btn">5月1日 (晋城)</div></label>
+                    <label><input type="checkbox" name="accommodation_dates" value="5月3日 (诸城)" class="hidden"><div class="option-btn">5月3日 (诸城)</div></label>
+                    <label><input type="checkbox" name="accommodation_dates" value="5月4日 (诸城)" class="hidden"><div class="option-btn">5月4日 (诸城)</div></label>
+                    <label><input type="checkbox" name="accommodation_dates" value="不需提供住宿" class="hidden"><div class="option-btn">不需提供住宿</div></label>
+                </div>
+            </div>
+
+            <div class="form-item">
+                <span class="form-label">4. 房型要求 (单选)</span>
+                <div class="option-group">
+                    <label><input type="radio" name="room_type" value="大床房" class="hidden"><div class="option-btn">大床房</div></label>
+                    <label><input type="radio" name="room_type" value="双床房" class="hidden"><div class="option-btn">双床房</div></label>
+                    <label><input type="radio" name="room_type" value="不住宿" class="hidden"><div class="option-btn">不住宿</div></label>
+                </div>
+            </div>
+
+            <div class="form-item">
+                <span class="form-label">5. 是否有意向参加晚间聚会 (After Party)</span>
+                <div class="flex gap-3">
+                    <label class="flex-1"><input type="radio" name="after_party" value="true" class="hidden"><div class="option-btn">参加</div></label>
+                    <label class="flex-1"><input type="radio" name="after_party" value="false" class="hidden"><div class="option-btn">不参加</div></label>
+                </div>
+            </div>
+
+            <button type="submit" class="submit-btn active:scale-95 transition-transform">提交确认回执</button>
+            
+            <div class="loading" id="loadingMessage">
+                正在提交中...
+            </div>
+            
+            <div class="success-message" id="successMessage">
+                ✓ 感谢您的回复！我们已收到您的邀请函确认。
+            </div>
+            
+            <div class="error-message" id="errorMessage">
+                ✗ 提交失败，请检查网络连接后重试。
+            </div>
+            
+            <div class="footer-text">
+                最后, 请添加我们的助理微信, 会与您沟通后续信息:<br>
+                <span class="font-bold text-gray-700">kejikitty</span>
+            </div>
+        </form>
+    </div>
+
+    <script>
+        // ============================================
+        // 配置后端 URL
+        // ============================================
+        // 本地测试时使用：
+        const BACKEND_URL = 'http://localhost:3001';
+        
+        // 生产环境部署后，改成您的域名：
+        // const BACKEND_URL = 'https://your-domain.com';
+        
+        // ============================================
+        // 表单提交处理
+        // ============================================
+        document.getElementById('inviteForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            // 获取 DOM 元素
+            const submitBtn = document.querySelector('.submit-btn');
+            const loadingMessage = document.getElementById('loadingMessage');
+            const successMessage = document.getElementById('successMessage');
+            const errorMessage = document.getElementById('errorMessage');
+            
+            // 隐藏所有消息
+            successMessage.style.display = 'none';
+            errorMessage.style.display = 'none';
+            loadingMessage.style.display = 'block';
+            
+            // 禁用提交按钮
+            submitBtn.disabled = true;
+            
+            try {
+                // 收集表单数据
+                const formData = new FormData(this);
+                
+                // 处理多选框数据（住宿日期）
+                const accommodationDates = formData.getAll('accommodation_dates');
+                
+                // 处理单选框数据（After Party）
+                const afterPartyValue = formData.get('after_party');
+                const afterParty = afterPartyValue === 'true' ? true : (afterPartyValue === 'false' ? false : null);
+                
+                // 构建要发送的数据
+                const data = {
+                    wedding_location: formData.get('wedding_location'),
+                    guest_name: formData.get('guest_name'),
+                    guest_count: parseInt(formData.get('guest_count')) || 0,
+                    accompanying_guests: formData.get('accompanying_guests') || '',
+                    accommodation_dates: accommodationDates.join(', '),
+                    room_type: formData.get('room_type') || '',
+                    after_party: afterParty
+                };
+                
+                console.log('发送的数据:', data); // 调试用
+                
+                // 发送数据到后端
+                const response = await fetch(`${BACKEND_URL}/api/rsvp/submit`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify(data)
+                });
+                
+                const result = await response.json();
+                
+                console.log('后端响应:', result); // 调试用
+                
+                // 隐藏加载消息
+                loadingMessage.style.display = 'none';
+                
+                // 显示结果
+                if (result.success) {
+                    successMessage.style.display = 'block';
+                    // 清空表单
+                    this.reset();
+                    // 3 秒后隐藏成功消息
+                    setTimeout(() => {
+                        successMessage.style.display = 'none';
+                    }, 3000);
+                } else {
+                    errorMessage.textContent = '✗ ' + (result.message || '提交失败');
+                    errorMessage.style.display = 'block';
+                }
+            } catch (error) {
+                console.error('错误:', error);
+                loadingMessage.style.display = 'none';
+                errorMessage.textContent = '✗ 网络错误，请检查后端服务器是否运行。';
+                errorMessage.style.display = 'block';
+            } finally {
+                // 重新启用提交按钮
+                submitBtn.disabled = false;
+            }
+        });
+        
+        // ============================================
+        // 调试信息
+        // ============================================
+        console.log('表单已加载，后端 URL:', BACKEND_URL);
+    </script>
+</body>
+</html>
