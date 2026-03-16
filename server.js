@@ -2,15 +2,16 @@ const express = require('express');
 const cors = require('cors');
 const bodyParser = require('body-parser');
 const dotenv = require('dotenv');
-const sqlite3 = require('sqlite3').verbose();
+const initSqlJs = require('sql.js');
 const nodemailer = require('nodemailer');
 const path = require('path');
+const fs = require('fs');
 
 // 加载环境变量
 dotenv.config();
 
 const app = express();
-const PORT = process.env.PORT || 3001;
+const PORT = process.env.PORT || 3000;
 
 // 中间件配置
 app.use(cors({
@@ -22,41 +23,66 @@ app.use(bodyParser.urlencoded({ extended: true }));
 
 // 数据库初始化
 const dbPath = path.join(__dirname, 'wedding_data.db');
-let db;
+let db = null;
+let SQL = null;
 
-db = new sqlite3.Database(dbPath, (err) => {
-  if (err) {
-    console.error('数据库连接失败:', err);
-    process.exit(1);
-  } else {
-    console.log('数据库连接成功');
-    initializeDatabase();
-  }
-});
-
-// 初始化数据库表
-function initializeDatabase() {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS rsvp_responses (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
-      wedding_location TEXT NOT NULL,
-      guest_name TEXT NOT NULL,
-      guest_count INTEGER NOT NULL,
-      accompanying_guests TEXT,
-      accommodation_dates TEXT,
-      room_type TEXT,
-      after_party BOOLEAN,
-      created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-      ip_address TEXT,
-      user_agent TEXT
-    )
-  `, (err) => {
-    if (err) {
-      console.error('创建表失败:', err);
-    } else {
-      console.log('RSVP 表创建成功或已存在');
+// 初始化 SQL.js 和数据库
+async function initializeDatabase() {
+  try {
+    SQL = await initSqlJs();
+    
+    // 尝试从文件加载现有数据库
+    let data = null;
+    if (fs.existsSync(dbPath)) {
+      data = fs.readFileSync(dbPath);
     }
-  });
+    
+    // 创建或加载数据库
+    if (data) {
+      db = new SQL.Database(data);
+    } else {
+      db = new SQL.Database();
+    }
+    
+    console.log('数据库连接成功');
+    
+    // 创建表
+    try {
+      db.run(`
+        CREATE TABLE IF NOT EXISTS rsvp_responses (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          wedding_location TEXT NOT NULL,
+          guest_name TEXT NOT NULL,
+          guest_count INTEGER NOT NULL,
+          accompanying_guests TEXT,
+          accommodation_dates TEXT,
+          room_type TEXT,
+          after_party BOOLEAN,
+          dietary_restrictions TEXT,
+          special_requests TEXT,
+          created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+          ip_address TEXT,
+          user_agent TEXT
+        )
+      `);
+      console.log('RSVP 表创建成功或已存在');
+      saveDatabase();
+    } catch (err) {
+      console.error('创建表失败:', err);
+    }
+  } catch (err) {
+    console.error('数据库初始化失败:', err);
+    process.exit(1);
+  }
+}
+
+// 保存数据库到文件
+function saveDatabase() {
+  if (db) {
+    const data = db.export();
+    const buffer = Buffer.from(data);
+    fs.writeFileSync(dbPath, buffer);
+  }
 }
 
 // 邮件配置（使用环境变量）
@@ -84,6 +110,13 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
 // 1. 提交 RSVP 表单
 app.post('/api/rsvp/submit', (req, res) => {
   try {
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: '数据库未初始化'
+      });
+    }
+
     const {
       wedding_location,
       guest_name,
@@ -91,7 +124,9 @@ app.post('/api/rsvp/submit', (req, res) => {
       accompanying_guests,
       accommodation_dates,
       room_type,
-      after_party
+      after_party,
+      dietary_restrictions,
+      special_requests
     } = req.body;
 
     // 数据验证
@@ -107,33 +142,33 @@ app.post('/api/rsvp/submit', (req, res) => {
     const user_agent = req.get('user-agent');
 
     // 插入数据库
-    const sql = `
-      INSERT INTO rsvp_responses (
-        wedding_location, guest_name, guest_count, accompanying_guests,
-        accommodation_dates, room_type, after_party, ip_address, user_agent
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
+    try {
+      db.run(`
+        INSERT INTO rsvp_responses (
+          wedding_location, guest_name, guest_count, accompanying_guests,
+          accommodation_dates, room_type, after_party, dietary_restrictions,
+          special_requests, ip_address, user_agent
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `, [
+        wedding_location,
+        guest_name,
+        guest_count,
+        accompanying_guests || '',
+        accommodation_dates || '',
+        room_type || '',
+        after_party ? 1 : 0,
+        dietary_restrictions || '',
+        special_requests || '',
+        ip_address,
+        user_agent
+      ]);
 
-    db.run(sql, [
-      wedding_location,
-      guest_name,
-      guest_count,
-      accompanying_guests || '',
-      accommodation_dates || '',
-      room_type || '',
-      after_party ? 1 : 0,
-      ip_address,
-      user_agent
-    ], function(err) {
-      if (err) {
-        console.error('插入数据失败:', err);
-        return res.status(500).json({
-          success: false,
-          message: '保存数据失败'
-        });
-      }
+      // 获取插入的 ID
+      const result = db.exec('SELECT last_insert_rowid() as id');
+      const response_id = result[0] ? result[0].values[0][0] : null;
 
-      const response_id = this.lastID;
+      // 保存数据库
+      saveDatabase();
 
       // 发送确认邮件给宾客
       if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
@@ -152,6 +187,8 @@ app.post('/api/rsvp/submit', (req, res) => {
               <li><strong>住宿日期：</strong> ${accommodation_dates || '不需要'}</li>
               <li><strong>房型：</strong> ${room_type || '无'}</li>
               <li><strong>晚间聚会：</strong> ${after_party ? '参加' : '不参加'}</li>
+              <li><strong>饮食限制：</strong> ${dietary_restrictions || '无'}</li>
+              <li><strong>特殊需求：</strong> ${special_requests || '无'}</li>
             </ul>
             <p>如有任何问题，请联系我们。</p>
             <p>管廷文 & 王昕</p>
@@ -182,6 +219,8 @@ app.post('/api/rsvp/submit', (req, res) => {
             <p><strong>住宿日期：</strong> ${accommodation_dates || '不需要'}</p>
             <p><strong>房型：</strong> ${room_type || '无'}</p>
             <p><strong>晚间聚会：</strong> ${after_party ? '参加' : '不参加'}</p>
+            <p><strong>饮食限制：</strong> ${dietary_restrictions || '无'}</p>
+            <p><strong>特殊需求：</strong> ${special_requests || '无'}</p>
             <p><strong>提交时间：</strong> ${new Date().toLocaleString('zh-CN')}</p>
             <p><strong>回复 ID：</strong> ${response_id}</p>
           `
@@ -201,7 +240,13 @@ app.post('/api/rsvp/submit', (req, res) => {
         message: '感谢您的回复！我们已经收到您的信息。',
         response_id: response_id
       });
-    });
+    } catch (dbErr) {
+      console.error('插入数据失败:', dbErr);
+      return res.status(500).json({
+        success: false,
+        message: '保存数据失败'
+      });
+    }
   } catch (error) {
     console.error('处理请求出错:', error);
     res.status(500).json({
@@ -224,20 +269,31 @@ app.get('/api/rsvp/list', (req, res) => {
   }
 
   try {
-    db.all('SELECT * FROM rsvp_responses ORDER BY created_at DESC', (err, rows) => {
-      if (err) {
-        console.error('查询错误:', err);
-        return res.status(500).json({
-          success: false,
-          message: '查询失败'
-        });
-      }
-
-      res.json({
-        success: true,
-        total: rows.length,
-        data: rows
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: '数据库未初始化'
       });
+    }
+
+    const result = db.exec('SELECT * FROM rsvp_responses ORDER BY created_at DESC');
+    const rows = [];
+    
+    if (result.length > 0) {
+      const columns = result[0].columns;
+      result[0].values.forEach(row => {
+        const obj = {};
+        columns.forEach((col, idx) => {
+          obj[col] = row[idx];
+        });
+        rows.push(obj);
+      });
+    }
+
+    res.json({
+      success: true,
+      total: rows.length,
+      data: rows
     });
   } catch (err) {
     console.error('查询错误:', err);
@@ -260,26 +316,37 @@ app.get('/api/rsvp/stats', (req, res) => {
   }
 
   try {
-    db.all(`
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: '数据库未初始化'
+      });
+    }
+
+    const result = db.exec(`
       SELECT 
         wedding_location,
         COUNT(*) as count,
         SUM(guest_count) as total_guests
       FROM rsvp_responses
       GROUP BY wedding_location
-    `, (err, rows) => {
-      if (err) {
-        console.error('查询错误:', err);
-        return res.status(500).json({
-          success: false,
-          message: '查询失败'
-        });
-      }
+    `);
 
-      res.json({
-        success: true,
-        data: rows
+    const rows = [];
+    if (result.length > 0) {
+      const columns = result[0].columns;
+      result[0].values.forEach(row => {
+        const obj = {};
+        columns.forEach((col, idx) => {
+          obj[col] = row[idx];
+        });
+        rows.push(obj);
       });
+    }
+
+    res.json({
+      success: true,
+      data: rows
     });
   } catch (err) {
     console.error('查询错误:', err);
@@ -302,38 +369,51 @@ app.get('/api/rsvp/export', (req, res) => {
   }
 
   try {
-    db.all('SELECT * FROM rsvp_responses ORDER BY created_at DESC', (err, rows) => {
-      if (err) {
-        console.error('查询错误:', err);
-        return res.status(500).json({
-          success: false,
-          message: '查询失败'
-        });
-      }
-
-      // 生成 CSV
-      const csv = [
-        ['ID', '婚礼地点', '宾客姓名', '参与人数', '随行人员', '住宿日期', '房型', '晚间聚会', '提交时间'].join(',')
-      ];
-
-      rows.forEach(row => {
-        csv.push([
-          row.id,
-          row.wedding_location,
-          row.guest_name,
-          row.guest_count,
-          row.accompanying_guests,
-          row.accommodation_dates,
-          row.room_type,
-          row.after_party ? '是' : '否',
-          row.created_at
-        ].join(','));
+    if (!db) {
+      return res.status(503).json({
+        success: false,
+        message: '数据库未初始化'
       });
+    }
 
-      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
-      res.setHeader('Content-Disposition', 'attachment; filename=wedding_rsvp.csv');
-      res.send('\ufeff' + csv.join('\n'));
+    const result = db.exec('SELECT * FROM rsvp_responses ORDER BY created_at DESC');
+    const rows = [];
+    
+    if (result.length > 0) {
+      const columns = result[0].columns;
+      result[0].values.forEach(row => {
+        const obj = {};
+        columns.forEach((col, idx) => {
+          obj[col] = row[idx];
+        });
+        rows.push(obj);
+      });
+    }
+
+    // 生成 CSV
+    const csv = [
+      ['ID', '婚礼地点', '宾客姓名', '参与人数', '随行人员', '住宿日期', '房型', '晚间聚会', '饮食限制', '特殊需求', '提交时间'].join(',')
+    ];
+
+    rows.forEach(row => {
+      csv.push([
+        row.id,
+        row.wedding_location,
+        row.guest_name,
+        row.guest_count,
+        row.accompanying_guests,
+        row.accommodation_dates,
+        row.room_type,
+        row.after_party ? '是' : '否',
+        row.dietary_restrictions,
+        row.special_requests,
+        row.created_at
+      ].join(','));
     });
+
+    res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+    res.setHeader('Content-Disposition', 'attachment; filename=wedding_rsvp.csv');
+    res.send('\ufeff' + csv.join('\n'));
   } catch (err) {
     console.error('查询错误:', err);
     res.status(500).json({
@@ -348,26 +428,37 @@ app.get('/api/health', (req, res) => {
   res.json({
     success: true,
     message: '服务器运行正常',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    dbStatus: db ? '已连接' : '未连接'
   });
 });
 
 // 启动服务器
-app.listen(PORT, () => {
-  console.log(`婚礼邀请函后端服务器运行在 http://localhost:${PORT}`);
-  console.log(`提交 RSVP: POST ${PORT}/api/rsvp/submit`);
-  console.log(`查看回复: GET ${PORT}/api/rsvp/list?token=YOUR_ADMIN_TOKEN`);
-  console.log(`查看统计: GET ${PORT}/api/rsvp/stats?token=YOUR_ADMIN_TOKEN`);
-  console.log(`导出数据: GET ${PORT}/api/rsvp/export?token=YOUR_ADMIN_TOKEN`);
-});
+async function startServer() {
+  await initializeDatabase();
+  
+  app.listen(PORT, () => {
+    console.log(`婚礼邀请函后端服务器运行在 http://localhost:${PORT}`);
+    console.log(`提交 RSVP: POST ${PORT}/api/rsvp/submit`);
+    console.log(`查看回复: GET ${PORT}/api/rsvp/list?token=YOUR_ADMIN_TOKEN`);
+    console.log(`查看统计: GET ${PORT}/api/rsvp/stats?token=YOUR_ADMIN_TOKEN`);
+    console.log(`导出数据: GET ${PORT}/api/rsvp/export?token=YOUR_ADMIN_TOKEN`);
+  });
+}
 
 // 优雅关闭
 process.on('SIGINT', () => {
   try {
-    db.close();
-    console.log('数据库已关闭');
+    saveDatabase();
+    console.log('数据库已保存并关闭');
   } catch (err) {
     console.error('关闭数据库出错:', err);
   }
   process.exit(0);
+});
+
+// 启动应用
+startServer().catch(err => {
+  console.error('启动服务器失败:', err);
+  process.exit(1);
 });
