@@ -25,26 +25,37 @@ app.use(bodyParser.urlencoded({ extended: true }));
 const dbPath = path.join(__dirname, 'wedding_data.db');
 let db = null;
 let SQL = null;
+let dbReady = false;
+
+console.log('开始初始化应用...');
+console.log('数据库路径:', dbPath);
+console.log('PORT:', PORT);
 
 // 初始化 SQL.js 和数据库
 async function initializeDatabase() {
   try {
+    console.log('正在加载 SQL.js...');
     SQL = await initSqlJs();
+    console.log('SQL.js 加载成功');
     
     // 尝试从文件加载现有数据库
     let data = null;
     if (fs.existsSync(dbPath)) {
+      console.log('找到现有数据库文件，正在加载...');
       data = fs.readFileSync(dbPath);
+      console.log('数据库文件大小:', data.length, 'bytes');
+    } else {
+      console.log('未找到现有数据库文件，创建新数据库');
     }
     
     // 创建或加载数据库
     if (data) {
       db = new SQL.Database(data);
+      console.log('从文件加载数据库成功');
     } else {
       db = new SQL.Database();
+      console.log('创建新数据库成功');
     }
-    
-    console.log('数据库连接成功');
     
     // 创建表
     try {
@@ -67,35 +78,44 @@ async function initializeDatabase() {
       `);
       console.log('RSVP 表创建成功或已存在');
       saveDatabase();
+      dbReady = true;
+      console.log('数据库初始化完成');
     } catch (err) {
       console.error('创建表失败:', err);
+      throw err;
     }
   } catch (err) {
     console.error('数据库初始化失败:', err);
-    process.exit(1);
+    throw err;
   }
 }
 
 // 保存数据库到文件
 function saveDatabase() {
-  if (db) {
-    const data = db.export();
-    const buffer = Buffer.from(data);
-    fs.writeFileSync(dbPath, buffer);
+  try {
+    if (db) {
+      const data = db.export();
+      const buffer = Buffer.from(data);
+      fs.writeFileSync(dbPath, buffer);
+      console.log('数据库已保存到文件');
+    }
+  } catch (err) {
+    console.error('保存数据库失败:', err);
   }
 }
 
 // 邮件配置（使用环境变量）
-const transporter = nodemailer.createTransport({
-  service: process.env.EMAIL_SERVICE || 'gmail',
-  auth: {
-    user: process.env.EMAIL_USER,
-    pass: process.env.EMAIL_PASSWORD
-  }
-});
-
-// 验证邮件配置
+let transporter = null;
 if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+  transporter = nodemailer.createTransport({
+    service: process.env.EMAIL_SERVICE || 'gmail',
+    auth: {
+      user: process.env.EMAIL_USER,
+      pass: process.env.EMAIL_PASSWORD
+    }
+  });
+
+  // 验证邮件配置
   transporter.verify((error, success) => {
     if (error) {
       console.log('邮件配置错误:', error);
@@ -103,6 +123,8 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
       console.log('邮件服务配置成功');
     }
   });
+} else {
+  console.log('未配置邮件服务（EMAIL_USER 或 EMAIL_PASSWORD 缺失）');
 }
 
 // API 路由
@@ -110,7 +132,7 @@ if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
 // 1. 提交 RSVP 表单
 app.post('/api/rsvp/submit', (req, res) => {
   try {
-    if (!db) {
+    if (!dbReady || !db) {
       return res.status(503).json({
         success: false,
         message: '数据库未初始化'
@@ -171,7 +193,7 @@ app.post('/api/rsvp/submit', (req, res) => {
       saveDatabase();
 
       // 发送确认邮件给宾客
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD) {
+      if (transporter && process.env.GUEST_EMAIL) {
         const guestMailOptions = {
           from: process.env.EMAIL_USER,
           to: process.env.GUEST_EMAIL || guest_name + '@example.com',
@@ -199,13 +221,13 @@ app.post('/api/rsvp/submit', (req, res) => {
           if (error) {
             console.log('发送宾客邮件失败:', error);
           } else {
-            console.log('宾客确认邮件已发送:', info.response);
+            console.log('宾客确认邮件已发送');
           }
         });
       }
 
       // 发送通知邮件给新人
-      if (process.env.EMAIL_USER && process.env.EMAIL_PASSWORD && process.env.OWNER_EMAIL) {
+      if (transporter && process.env.OWNER_EMAIL) {
         const ownerMailOptions = {
           from: process.env.EMAIL_USER,
           to: process.env.OWNER_EMAIL,
@@ -230,7 +252,7 @@ app.post('/api/rsvp/submit', (req, res) => {
           if (error) {
             console.log('发送新人邮件失败:', error);
           } else {
-            console.log('新人通知邮件已发送:', info.response);
+            console.log('新人通知邮件已发送');
           }
         });
       }
@@ -269,7 +291,7 @@ app.get('/api/rsvp/list', (req, res) => {
   }
 
   try {
-    if (!db) {
+    if (!dbReady || !db) {
       return res.status(503).json({
         success: false,
         message: '数据库未初始化'
@@ -316,7 +338,7 @@ app.get('/api/rsvp/stats', (req, res) => {
   }
 
   try {
-    if (!db) {
+    if (!dbReady || !db) {
       return res.status(503).json({
         success: false,
         message: '数据库未初始化'
@@ -369,7 +391,7 @@ app.get('/api/rsvp/export', (req, res) => {
   }
 
   try {
-    if (!db) {
+    if (!dbReady || !db) {
       return res.status(503).json({
         success: false,
         message: '数据库未初始化'
@@ -429,25 +451,34 @@ app.get('/api/health', (req, res) => {
     success: true,
     message: '服务器运行正常',
     timestamp: new Date().toISOString(),
-    dbStatus: db ? '已连接' : '未连接'
+    dbStatus: dbReady ? '已连接' : '未连接'
   });
 });
 
 // 启动服务器
 async function startServer() {
-  await initializeDatabase();
-  
-  app.listen(PORT, () => {
-    console.log(`婚礼邀请函后端服务器运行在 http://localhost:${PORT}`);
-    console.log(`提交 RSVP: POST ${PORT}/api/rsvp/submit`);
-    console.log(`查看回复: GET ${PORT}/api/rsvp/list?token=YOUR_ADMIN_TOKEN`);
-    console.log(`查看统计: GET ${PORT}/api/rsvp/stats?token=YOUR_ADMIN_TOKEN`);
-    console.log(`导出数据: GET ${PORT}/api/rsvp/export?token=YOUR_ADMIN_TOKEN`);
-  });
+  try {
+    console.log('正在初始化数据库...');
+    await initializeDatabase();
+    console.log('数据库初始化完成');
+    
+    app.listen(PORT, () => {
+      console.log(`婚礼邀请函后端服务器运行在 http://localhost:${PORT}`);
+      console.log(`提交 RSVP: POST ${PORT}/api/rsvp/submit`);
+      console.log(`查看回复: GET ${PORT}/api/rsvp/list?token=YOUR_ADMIN_TOKEN`);
+      console.log(`查看统计: GET ${PORT}/api/rsvp/stats?token=YOUR_ADMIN_TOKEN`);
+      console.log(`导出数据: GET ${PORT}/api/rsvp/export?token=YOUR_ADMIN_TOKEN`);
+      console.log(`健康检查: GET ${PORT}/api/health`);
+    });
+  } catch (err) {
+    console.error('启动服务器失败:', err);
+    process.exit(1);
+  }
 }
 
 // 优雅关闭
 process.on('SIGINT', () => {
+  console.log('收到 SIGINT 信号，正在关闭...');
   try {
     saveDatabase();
     console.log('数据库已保存并关闭');
@@ -457,8 +488,26 @@ process.on('SIGINT', () => {
   process.exit(0);
 });
 
+process.on('SIGTERM', () => {
+  console.log('收到 SIGTERM 信号，正在关闭...');
+  try {
+    saveDatabase();
+    console.log('数据库已保存并关闭');
+  } catch (err) {
+    console.error('关闭数据库出错:', err);
+  }
+  process.exit(0);
+});
+
+// 未捕获的异常处理
+process.on('uncaughtException', (err) => {
+  console.error('未捕获的异常:', err);
+  process.exit(1);
+});
+
 // 启动应用
+console.log('应用启动中...');
 startServer().catch(err => {
-  console.error('启动服务器失败:', err);
+  console.error('启动应用失败:', err);
   process.exit(1);
 });
