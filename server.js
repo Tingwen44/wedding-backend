@@ -12,13 +12,13 @@ const PORT = process.env.PORT || 3000;
 
 // 中间件配置
 app.use(cors({
-  origin: ['https://tingwen44.github.io', 'https://wedding-invitation-vercel-nine.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+  origin: ['https://tingwen44.github.io', 'https://wedding-invitation-vercel-nine.vercel.app', 'https://prismatic-dango-aba083.netlify.app', 'http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
 
 // 处理 OPTIONS 预检请求
 app.options('*', cors({
-  origin: ['https://tingwen44.github.io', 'https://wedding-invitation-vercel-nine.vercel.app', 'http://localhost:3000', 'http://localhost:5173'],
+  origin: ['https://tingwen44.github.io', 'https://wedding-invitation-vercel-nine.vercel.app', 'https://prismatic-dango-aba083.netlify.app', 'http://localhost:3000', 'http://localhost:5173'],
   credentials: true
 }));
 app.use(bodyParser.json());
