@@ -195,10 +195,38 @@ app.get('/api/rsvp/list', (req, res) => {
   }
 
   try {
+    // 获取分页参数
+    const page = parseInt(req.query.page) || 1;
+    const pageSize = parseInt(req.query.pageSize) || 10;
+    const days = parseInt(req.query.days) || 90; // 默认最近 90 天（3 个月）
+    
+    // 计算时间范围
+    const now = new Date();
+    const threeMonthsAgo = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+    
+    // 过滤最近 N 天的数据
+    const filteredData = rsvpResponses.filter(response => {
+      const responseDate = new Date(response.created_at);
+      return responseDate >= threeMonthsAgo;
+    });
+    
+    // 按时间倒序排列
+    const sortedData = filteredData.sort((a, b) => new Date(b.created_at) - new Date(a.created_at));
+    
+    // 计算分页
+    const total = sortedData.length;
+    const totalPages = Math.ceil(total / pageSize);
+    const startIndex = (page - 1) * pageSize;
+    const endIndex = startIndex + pageSize;
+    const pageData = sortedData.slice(startIndex, endIndex);
+    
     res.json({
       success: true,
-      total: rsvpResponses.length,
-      data: rsvpResponses.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      total: total,
+      totalPages: totalPages,
+      currentPage: page,
+      pageSize: pageSize,
+      data: pageData
     });
   } catch (err) {
     console.error('查询错误:', err);
