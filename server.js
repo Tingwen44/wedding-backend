@@ -71,10 +71,19 @@ app.post('/api/rsvp/submit', (req, res) => {
     } = req.body;
 
     // 数据验证
-    if (!wedding_location || !guest_name || !guest_count) {
+    if (!wedding_location || !guest_name) {
       return res.status(400).json({
         success: false,
-        message: '缺少必填字段'
+        message: '缺少必填字段：婚礼地点和嘉宾姓名必填'
+      });
+    }
+    
+    // 验证 guest_count 是否为有效的正整数
+    const guestCountNum = parseInt(guest_count);
+    if (isNaN(guestCountNum) || guestCountNum <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: '参与人数必须是大于0的整数'
       });
     }
 
