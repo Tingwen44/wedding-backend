@@ -77,15 +77,6 @@ app.post('/api/rsvp/submit', (req, res) => {
         message: '缺少必填字段：婚礼地点和嘉宾姓名必填'
       });
     }
-    
-    // 验证 guest_count 是否为有效的正整数
-    const guestCountNum = parseInt(guest_count);
-    if (isNaN(guestCountNum) || guestCountNum <= 0) {
-      return res.status(400).json({
-        success: false,
-        message: '参与人数必须是大于0的整数'
-      });
-    }
 
     // 获取客户端 IP 和 User-Agent
     const ip_address = req.ip || req.connection.remoteAddress;
@@ -96,7 +87,6 @@ app.post('/api/rsvp/submit', (req, res) => {
       id: rsvpResponses.length + 1,
       wedding_location,
       guest_name,
-      guest_count,
       accompanying_guests: accompanying_guests || '',
       accommodation_dates: accommodation_dates || '',
       room_type: room_type || '',
